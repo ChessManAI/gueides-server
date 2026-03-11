@@ -5,8 +5,17 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
+// 1. La respuesta para el "Guardia" de Railway. Esto evita que bloquee la conexión.
+app.get('/', (req, res) => {
+    res.send('El Cuartel General de Gueides está 100% operativo.');
+});
+
+// 2. Permisos CORS explícitos para Hostinger
 const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { 
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
 
 let games = {};
