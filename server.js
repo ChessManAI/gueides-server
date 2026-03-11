@@ -5,55 +5,49 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Esto permite que Hostinger y Railway hablen sin bloqueos
+// Configuración de CORS para permitir la conexión desde Hostinger
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
 
-let rooms = {};
+let games = {}; // Usamos 'games' como tenías en tu imagen
 
 io.on('connection', (socket) => {
-    console.log('Usuario conectado:', socket.id);
+    console.log('📡 Un comandante se ha conectado:', socket.id);
 
-    socket.on('createRoom', () => {
-        const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-        // Ahora guardamos también los tiempos (600 segundos = 10 min)
-        rooms[roomId] = {
+    // 1. Un jugador crea una partida
+    socket.on('createGame', () => {
+        const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+        games[roomCode] = { 
             players: [socket.id],
-            board: null,
-            turn: 'black', // Inician negras según tu tablero
             timers: { black: 600, white: 600 },
-            lastTick: null
+            turn: 'black'
         };
-        socket.join(roomId);
-        socket.emit('roomCreated', roomId);
-        console.log('Sala creada:', roomId);
+        socket.join(roomCode);
+        socket.emit('gameCreated', roomCode);
+        console.log('Sala creada:', roomCode);
     });
 
-    socket.on('joinRoom', (roomId) => {
-        if (rooms[roomId] && rooms[roomId].players.length < 2) {
-            rooms[roomId].players.push(socket.id);
-            socket.join(roomId);
-            // El segundo en entrar siempre será Blancas
-            io.to(roomId).emit('playerJoined', { 
-                roomId, 
-                whitePlayer: socket.id 
-            });
+    // 2. Un jugador se une
+    socket.on('joinGame', (roomCode) => {
+        if (games[roomCode] && games[roomCode].players.length < 2) {
+            games[roomCode].players.push(socket.id);
+            socket.join(roomCode);
+            io.to(roomCode).emit('playerJoined', { roomCode, whitePlayer: socket.id });
+            console.log('Jugador unido a:', roomCode);
         } else {
-            socket.emit('error', 'Sala llena o no existe');
+            socket.emit('error', 'Sala llena o inexistente');
         }
     });
 
+    // 3. Movimiento de piezas
     socket.on('makeMove', (data) => {
-        const { roomId, move } = data;
-        if (rooms[roomId]) {
-            rooms[roomId].board = move.board;
-            rooms[roomId].turn = move.turn;
-            // Reenviamos la jugada al oponente
-            socket.to(roomId).emit('moveMade', move);
+        const { roomCode, move } = data;
+        if (games[roomCode]) {
+            socket.to(roomCode).emit('moveMade', move);
         }
     });
 
@@ -64,5 +58,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Servidor Gueides corriendo en puerto ${PORT}`);
+    console.log(`Servidor Gueides listo en puerto ${PORT}`);
 });
