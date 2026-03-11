@@ -9,40 +9,40 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-const games = {};
+let games = {};
 
 io.on('connection', (socket) => {
-    console.log('📡 Un comandante se ha conectado:', socket.id);
+    console.log('Comandante conectado:', socket.id);
 
     socket.on('createGame', () => {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-        games[roomCode] = { players: [socket.id] };
+        games[roomCode] = { players: [socket.id], turn: 'black' };
         socket.join(roomCode);
-        socket.emit('gameCreated', { roomCode, color: 'black' }); 
+        socket.emit('gameCreated', { roomCode: roomCode, color: 'black' });
     });
 
     socket.on('joinGame', (roomCode) => {
-        roomCode = roomCode.toUpperCase();
-        if (games[roomCode] && games[roomCode].players.length === 1) {
+        if (games[roomCode] && games[roomCode].players.length < 2) {
             games[roomCode].players.push(socket.id);
             socket.join(roomCode);
-            socket.emit('gameJoined', { roomCode, color: 'white' });
-            io.to(roomCode).emit('gameStarted', '¡Ambos comandantes en línea!');
-        } else {
-            socket.emit('error', 'Código inválido o sala llena.');
+            socket.emit('gameJoined', { roomCode: roomCode, color: 'white' });
+            io.to(roomCode).emit('gameStarted', '¡El oponente se ha unido! Que comience la batalla.');
         }
     });
 
     socket.on('sendMove', (data) => {
-        socket.to(data.roomCode).emit('receiveMove', data.move);
+        const { roomCode, move } = data;
+        if (games[roomCode]) {
+            socket.to(roomCode).emit('receiveMove', move);
+        }
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Comandante desconectado:', socket.id);
+        console.log('Comandante desconectado:', socket.id);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 SERVIDOR GUEIDES ACTIVO`);
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Servidor de Gueides War Game operando en el puerto ${PORT}`);
 });
