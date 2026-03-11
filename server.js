@@ -2,6 +2,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+    console.error('UNHANDLED REJECTION:', err);
+});
+
 const app = express();
 const server = http.createServer(app);
 
@@ -70,10 +78,7 @@ function closeRoom(roomCode, reason = 'La sala fue cerrada.') {
     const game = games.get(roomCode);
     if (!game) return;
 
-    io.to(roomCode).emit('roomClosed', {
-        roomCode,
-        reason
-    });
+    io.to(roomCode).emit('roomClosed', { roomCode, reason });
 
     for (const color of ['black', 'white']) {
         const sid = game.players[color];
@@ -120,7 +125,6 @@ io.on('connection', (socket) => {
         });
 
         emitRoomState(roomCode);
-        console.log(`Sala creada: ${roomCode}`);
     });
 
     socket.on('joinGame', (rawRoomCode) => {
@@ -142,11 +146,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const currentRoom = socketToRoom.get(socket.id);
-        if (currentRoom) {
-            closeRoom(currentRoom, 'La partida anterior fue reemplazada por una nueva.');
-        }
-
         game.players.white = socket.id;
         game.started = true;
 
@@ -165,7 +164,6 @@ io.on('connection', (socket) => {
         });
 
         emitRoomState(roomCode);
-        console.log(`Jugador unido a la sala: ${roomCode}`);
     });
 
     socket.on('sendMove', (data) => {
@@ -240,6 +238,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor de Gueides War Game operando en el puerto ${PORT}`);
 });
