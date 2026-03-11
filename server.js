@@ -26,8 +26,8 @@ const io = new Server(server, {
     transports: ['websocket', 'polling']
 });
 
-const games = new Map();       // roomCode -> game
-const socketToRoom = new Map(); // socket.id -> roomCode
+const games = new Map();
+const socketToRoom = new Map();
 
 function generateRoomCode() {
     let code;
