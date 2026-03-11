@@ -5,54 +5,54 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para permitir la conexión desde Hostinger
+// Permiso para que Hostinger se conecte
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-let games = {}; // Usamos 'games' como tenías en tu imagen
+let games = {};
 
 io.on('connection', (socket) => {
     console.log('📡 Un comandante se ha conectado:', socket.id);
 
-    // 1. Un jugador crea una partida
+    // 1. El jugador le da a "CREAR PARTIDA"
     socket.on('createGame', () => {
         const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-        games[roomCode] = { 
-            players: [socket.id],
-            timers: { black: 600, white: 600 },
-            turn: 'black'
-        };
+        games[roomCode] = { players: [socket.id], turn: 'black' };
         socket.join(roomCode);
-        socket.emit('gameCreated', roomCode);
+        
+        // ¡Tu engine.js espera un objeto con roomCode y color!
+        socket.emit('gameCreated', { roomCode: roomCode, color: 'black' });
         console.log('Sala creada:', roomCode);
     });
 
-    // 2. Un jugador se une
+    // 2. El jugador le da a "UNIRSE"
     socket.on('joinGame', (roomCode) => {
         if (games[roomCode] && games[roomCode].players.length < 2) {
             games[roomCode].players.push(socket.id);
             socket.join(roomCode);
-            io.to(roomCode).emit('playerJoined', { roomCode, whitePlayer: socket.id });
-            console.log('Jugador unido a:', roomCode);
+            
+            // Le decimos al jugador 2 que entró con blancas
+            socket.emit('gameJoined', { roomCode: roomCode, color: 'white' });
+            
+            // Les avisamos a ambos que ya pueden jugar
+            io.to(roomCode).emit('gameStarted', '¡El oponente se ha unido! Que comience la batalla.');
         } else {
             socket.emit('error', 'Sala llena o inexistente');
         }
     });
 
-    // 3. Movimiento de piezas
-    socket.on('makeMove', (data) => {
+    // 3. Un jugador mueve una pieza
+    socket.on('sendMove', (data) => {
         const { roomCode, move } = data;
         if (games[roomCode]) {
-            socket.to(roomCode).emit('moveMade', move);
+            // Reenviamos el movimiento al oponente
+            socket.to(roomCode).emit('receiveMove', move);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('Usuario desconectado');
+        console.log('Usuario desconectado:', socket.id);
     });
 });
 
