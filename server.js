@@ -5,62 +5,64 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Configuramos Socket.io permitiendo conexiones desde cualquier origen (CORS)
+// Esto permite que Hostinger y Railway hablen sin bloqueos
 const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"]
+    }
 });
 
-// Memoria temporal para guardar las salas activas
-const games = {};
+let rooms = {};
 
 io.on('connection', (socket) => {
-    console.log('📡 Un comandante se ha conectado al radar:', socket.id);
+    console.log('Usuario conectado:', socket.id);
 
-    // 1. Un jugador crea una partida
-    socket.on('createGame', () => {
-        const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-        games[roomCode] = { players: [socket.id] };
-        
-        socket.join(roomCode);
-        // Le enviamos su código y le asignamos el Sur (Negras)
-        socket.emit('gameCreated', { roomCode, color: 'black' }); 
-        console.log(`🎯 Partida creada. Código: ${roomCode}`);
+    socket.on('createRoom', () => {
+        const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        // Ahora guardamos también los tiempos (600 segundos = 10 min)
+        rooms[roomId] = {
+            players: [socket.id],
+            board: null,
+            turn: 'black', // Inician negras según tu tablero
+            timers: { black: 600, white: 600 },
+            lastTick: null
+        };
+        socket.join(roomId);
+        socket.emit('roomCreated', roomId);
+        console.log('Sala creada:', roomId);
     });
 
-    // 2. Un jugador se une con un código
-    socket.on('joinGame', (roomCode) => {
-        roomCode = roomCode.toUpperCase();
-        
-        if (games[roomCode] && games[roomCode].players.length === 1) {
-            games[roomCode].players.push(socket.id);
-            socket.join(roomCode);
-            
-            // Le asignamos el Norte (Blancas) al invitado
-            socket.emit('gameJoined', { roomCode, color: 'white' });
-            
-            // Avisamos a toda la sala que la guerra ha comenzado
-            io.to(roomCode).emit('gameStarted', '¡Ambos comandantes en línea!');
-            console.log(`⚔️ Combate iniciado en la sala: ${roomCode}`);
+    socket.on('joinRoom', (roomId) => {
+        if (rooms[roomId] && rooms[roomId].players.length < 2) {
+            rooms[roomId].players.push(socket.id);
+            socket.join(roomId);
+            // El segundo en entrar siempre será Blancas
+            io.to(roomId).emit('playerJoined', { 
+                roomId, 
+                whitePlayer: socket.id 
+            });
         } else {
-            socket.emit('error', 'Código de canal inválido o sala llena.');
+            socket.emit('error', 'Sala llena o no existe');
         }
     });
 
-    // 3. Pasar las maniobras a la velocidad de la luz
-    socket.on('sendMove', (data) => {
-        // data contiene la sala y las coordenadas (fr, fc, tr, tc)
-        // Usamos socket.to().emit() para enviarlo a todos en la sala EXCEPTO al que movió
-        socket.to(data.roomCode).emit('receiveMove', data.move);
+    socket.on('makeMove', (data) => {
+        const { roomId, move } = data;
+        if (rooms[roomId]) {
+            rooms[roomId].board = move.board;
+            rooms[roomId].turn = move.turn;
+            // Reenviamos la jugada al oponente
+            socket.to(roomId).emit('moveMade', move);
+        }
     });
 
-    // 4. Manejar desconexiones
     socket.on('disconnect', () => {
-        console.log('❌ Comandante desconectado:', socket.id);
-        // (En el futuro aquí pondremos la lógica para avisar de una rendición por desconexión)
+        console.log('Usuario desconectado');
     });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🚀 SERVIDOR GUEIDES ACTIVO en el puerto ${PORT}`);
+    console.log(`Servidor Gueides corriendo en puerto ${PORT}`);
 });
