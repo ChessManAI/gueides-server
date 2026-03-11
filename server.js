@@ -1,16 +1,12 @@
+const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-    res.end('Servidor Gueides War Game en linea');
-});
+const app = express();
+const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: "*" }
 });
 
 let games = {};
@@ -48,5 +44,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Servidor operando en el puerto ${PORT}`);
+    console.log(`Servidor de Gueides War Game operando en el puerto ${PORT}`);
 });
